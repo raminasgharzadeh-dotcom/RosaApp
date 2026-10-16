@@ -14,50 +14,121 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#55060620" />
+        android:background="#77060620" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="16dp">
 
-        <FrameLayout
-            android:layout_width="190dp"
-            android:layout_height="190dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <View
-                android:id="@+id/ring"
+            <FrameLayout
+                android:layout_width="110dp"
+                android:layout_height="110dp">
+
+                <View
+                    android:id="@+id/ring"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/ring" />
+
+                <ImageView
+                    android:id="@+id/avatar"
+                    android:layout_width="86dp"
+                    android:layout_height="86dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/rosa_title"
+                    android:scaleType="centerCrop" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/rosa_title"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/greeting"
+                    android:textColor="#D9D5FF"
+                    android:textSize="15sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ScrollView
+            android:id="@+id/scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="12dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/messages"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/ring" />
-
-            <ImageView
-                android:id="@+id/avatar"
-                android:layout_width="164dp"
-                android:layout_height="164dp"
-                android:layout_gravity="center"
-                android:contentDescription="@string/rosa_title"
-                android:scaleType="centerCrop" />
-        </FrameLayout>
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/status"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/rosa_title"
-            android:textColor="#FFFFFF"
-            android:textSize="34sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
             android:gravity="center"
-            android:text="@string/greeting"
-            android:textColor="#D9D5FF"
-            android:textSize="18sp" />
+            android:text="@string/thinking"
+            android:textColor="#BDB8E6"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bubble_rosa"
+                android:hint="@string/hint_input"
+                android:inputType="textMultiLine"
+                android:maxLines="4"
+                android:minHeight="48dp"
+                android:padding="12dp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#B0ABD8" />
+
+            <Button
+                android:id="@+id/sendButton"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bubble_user"
+                android:minWidth="0dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="@string/send"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>
