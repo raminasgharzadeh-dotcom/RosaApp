@@ -4,4 +4,13 @@
     <string name="greeting">روزت بخیر، چه کمکی می‌تونم بکنم؟</string>
     <string name="hello_title">سلام، من رزا هستم</string>
     <string name="hello_subtitle">مرحله ۱: ساخت اپ با موفقیت انجام شد</string>
+    <string name="hint_input">اینجا بنویس…</string>
+    <string name="send">ارسال</string>
+    <string name="thinking">رزا در حال فکر کردن…</string>
+    <string name="key_title">کلید OpenRouter</string>
+    <string name="key_message">کلید OpenRouter خودت را وارد کن. فقط روی همین گوشی ذخیره می‌شود.</string>
+    <string name="err_key">کلید درست نیست. دوباره پیام بده تا کلید جدید را بپرسم.</string>
+    <string name="err_limit">سقف رایگان این لحظه یا امروز تمام شد. کمی بعد دوباره امتحان کن.</string>
+    <string name="err_network">اتصال اینترنت یا VPN مشکل دارد. دوباره امتحان کن.</string>
+    <string name="err_generic">یه مشکلی پیش اومد. دوباره امتحان کن.</string>
 </resources>
