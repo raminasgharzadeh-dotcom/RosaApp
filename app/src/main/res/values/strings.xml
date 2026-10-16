@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">رزا</string>
+    <string name="rosa_title">رزا</string>
+    <string name="greeting">روزت بخیر، چه کمکی می‌تونم بکنم؟</string>
     <string name="hello_title">سلام، من رزا هستم</string>
     <string name="hello_subtitle">مرحله ۱: ساخت اپ با موفقیت انجام شد</string>
 </resources>
