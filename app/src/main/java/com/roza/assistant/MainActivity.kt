@@ -12,6 +12,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Outline
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -28,15 +30,32 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
     private val history = ArrayList<Pair<String, String>>()
+    private val handler = Handler(Looper.getMainLooper())
     private var busy = false
     private var listening = false
+    private var rosaOn = true
+    private var awake = false
+    private var failures = 0
+    private var updatingSwitch = false
     private var language = "fa-IR"
     private var recognizer: SpeechRecognizer? = null
+
+    // The wake phrase: "سلام رزا" in Persian, or "hello rosa" in English.
+    private val wakeRegex = Regex(
+        "(سلام\\s*(رزا|روزا|رضا|رزه)|(hello|hey|hi)\\s*(rosa|roza|rosie))",
+        RegexOption.IGNORE_CASE
+    )
+
+    private val sleepRunnable = Runnable {
+        awake = false
+        if (rosaOn && !busy) status.text = getString(R.string.wait_wake)
+    }
 
     private lateinit var messages: LinearLayout
     private lateinit var scroll: ScrollView
@@ -44,13 +63,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sendButton: Button
     private lateinit var micButton: Button
     private lateinit var langButton: Button
+    private lateinit var powerSwitch: SwitchCompat
     private lateinit var status: TextView
 
     private val micPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
-                startListening()
+                if (rosaOn) scheduleListen(0) else startListening()
             } else {
+                if (rosaOn) setRosaOn(false)
                 status.text = getString(R.string.err_mic_permission)
             }
         }
@@ -68,38 +89,115 @@ class MainActivity : AppCompatActivity() {
         sendButton = findViewById<Button>(R.id.sendButton)
         micButton = findViewById<Button>(R.id.micButton)
         langButton = findViewById<Button>(R.id.langButton)
+        powerSwitch = findViewById<SwitchCompat>(R.id.powerSwitch)
         status = findViewById<TextView>(R.id.status)
 
         makeRound(avatar)
         loadImagesFromAssets(avatar, background)
         startBreathing(avatar, ring)
 
+        rosaOn = prefs().getBoolean("on", true)
+        showSwitch(rosaOn)
+
         sendButton.setOnClickListener { onSend() }
         micButton.setOnClickListener { onMicClick() }
+        powerSwitch.setOnCheckedChangeListener { _, checked ->
+            if (!updatingSwitch) setRosaOn(checked)
+        }
         langButton.setOnClickListener {
             language = if (language == "fa-IR") "en-US" else "fa-IR"
             langButton.text = getString(if (language == "fa-IR") R.string.lang_fa else R.string.lang_en)
+            if (listening) {
+                stopRecognizer()
+                if (rosaOn) scheduleListen(200)
+            }
         }
     }
 
+    // The microphone is only used while the app is on screen.
+    override fun onResume() {
+        super.onResume()
+        if (rosaOn) {
+            ensureMicThenListen()
+        } else {
+            status.text = getString(R.string.off_status)
+        }
+    }
+
+    // When the app leaves the screen, shut the recognizer down completely.
+    override fun onPause() {
+        handler.removeCallbacksAndMessages(null)
+        releaseRecognizer()
+        awake = false
+        super.onPause()
+    }
+
     override fun onDestroy() {
-        recognizer?.destroy()
-        recognizer = null
+        handler.removeCallbacksAndMessages(null)
+        releaseRecognizer()
         super.onDestroy()
+    }
+
+    // ---------- on / off ----------
+
+    private fun showSwitch(on: Boolean) {
+        updatingSwitch = true
+        powerSwitch.isChecked = on
+        updatingSwitch = false
+    }
+
+    private fun setRosaOn(on: Boolean) {
+        rosaOn = on
+        prefs().edit().putBoolean("on", on).apply()
+        awake = false
+        failures = 0
+        handler.removeCallbacksAndMessages(null)
+        showSwitch(on)
+        if (on) {
+            ensureMicThenListen()
+        } else {
+            stopRecognizer()
+            status.text = getString(R.string.off_status)
+        }
     }
 
     // ---------- voice input ----------
 
+    private fun hasMicPermission(): Boolean =
+        ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+    private fun ensureMicThenListen() {
+        if (hasMicPermission()) {
+            scheduleListen(0)
+        } else {
+            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun scheduleListen(delay: Long) {
+        handler.postDelayed({
+            if (rosaOn && !busy && !listening) startListening()
+        }, delay)
+    }
+
     private fun onMicClick() {
         if (busy) return
+        if (rosaOn) {
+            // Rosa is already listening: treat the next sentence as a command.
+            awake = true
+            status.text = getString(R.string.say_command)
+            handler.removeCallbacks(sleepRunnable)
+            handler.postDelayed(sleepRunnable, 15000)
+            if (!listening) scheduleListen(0)
+            return
+        }
         if (listening) {
             recognizer?.stopListening()
             return
         }
-        val granted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        if (granted) {
+        if (hasMicPermission()) {
             startListening()
         } else {
             micPermission.launch(Manifest.permission.RECORD_AUDIO)
@@ -111,12 +209,33 @@ class MainActivity : AppCompatActivity() {
         micButton.text = if (value) "⏹" else "🎤"
     }
 
+    private fun stopRecognizer() {
+        recognizer?.cancel()
+        setListening(false)
+    }
+
+    private fun releaseRecognizer() {
+        recognizer?.cancel()
+        recognizer?.destroy()
+        recognizer = null
+        setListening(false)
+    }
+
     private fun firstResult(bundle: Bundle?): String {
         val list = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         return list?.firstOrNull()?.trim() ?: ""
     }
 
+    private fun normalize(text: String): String {
+        return text
+            .replace('ي', 'ی')
+            .replace('ك', 'ک')
+            .replace(Regex("[\\u064B-\\u065F]"), "")
+            .trim()
+    }
+
     private fun startListening() {
+        if (listening) return
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             status.text = getString(R.string.err_no_recognizer)
             return
@@ -133,6 +252,7 @@ class MainActivity : AppCompatActivity() {
             override fun onEvent(eventType: Int, params: Bundle?) {}
 
             override fun onPartialResults(partialResults: Bundle?) {
+                if (rosaOn) return
                 val text = firstResult(partialResults)
                 if (text.isNotEmpty()) {
                     input.setText(text)
@@ -142,8 +262,11 @@ class MainActivity : AppCompatActivity() {
 
             override fun onResults(results: Bundle?) {
                 setListening(false)
+                failures = 0
                 val text = firstResult(results)
-                if (text.isEmpty()) {
+                if (rosaOn) {
+                    handleLoopResult(text)
+                } else if (text.isEmpty()) {
                     status.text = getString(R.string.err_heard_nothing)
                 } else {
                     status.text = ""
@@ -154,16 +277,22 @@ class MainActivity : AppCompatActivity() {
 
             override fun onError(error: Int) {
                 setListening(false)
-                val message = when (error) {
-                    SpeechRecognizer.ERROR_NO_MATCH,
-                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> getString(R.string.err_heard_nothing)
-                    SpeechRecognizer.ERROR_NETWORK,
-                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
-                    SpeechRecognizer.ERROR_SERVER -> getString(R.string.err_speech_network)
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> getString(R.string.err_mic_permission)
-                    else -> getString(R.string.err_speech_generic)
+                recognizer?.destroy()
+                recognizer = null
+                if (rosaOn) {
+                    handleLoopError(error)
+                } else {
+                    val message = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH,
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> getString(R.string.err_heard_nothing)
+                        SpeechRecognizer.ERROR_NETWORK,
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
+                        SpeechRecognizer.ERROR_SERVER -> getString(R.string.err_speech_network)
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> getString(R.string.err_mic_permission)
+                        else -> getString(R.string.err_speech_generic)
+                    }
+                    status.text = message + " (" + error + ")"
                 }
-                status.text = message + " (" + error + ")"
             }
         })
 
@@ -175,10 +304,82 @@ class MainActivity : AppCompatActivity() {
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        // Ask the recognizer to wait longer before deciding a sentence is finished.
+        // Google's recognizer may ignore these values.
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+        intent.putExtra(
+            RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+            2000L
+        )
 
         setListening(true)
-        status.text = getString(R.string.listening)
+        status.text = getString(
+            if (!rosaOn) R.string.listening
+            else if (awake) R.string.say_command
+            else R.string.wait_wake
+        )
         engine.startListening(intent)
+    }
+
+    // What to do with a sentence heard while Rosa is switched on.
+    private fun handleLoopResult(text: String) {
+        if (busy) return
+        if (text.isEmpty()) {
+            scheduleListen(300)
+            return
+        }
+        val normalized = normalize(text)
+        val match = wakeRegex.find(normalized)
+        if (match != null) {
+            val rest = normalized.substring(match.range.last + 1)
+                .trim()
+                .trimStart('،', ',', '.', ' ')
+            if (rest.length > 2) {
+                awake = false
+                sendText(rest)
+            } else {
+                awake = true
+                addBubble(getString(R.string.wake_reply), false)
+                status.text = getString(R.string.say_command)
+                handler.removeCallbacks(sleepRunnable)
+                handler.postDelayed(sleepRunnable, 15000)
+                scheduleListen(200)
+            }
+        } else if (awake) {
+            awake = false
+            handler.removeCallbacks(sleepRunnable)
+            sendText(text)
+        } else {
+            // Not for Rosa: ignore it and keep waiting for the wake phrase.
+            scheduleListen(200)
+        }
+    }
+
+    private fun handleLoopError(error: Int) {
+        when (error) {
+            SpeechRecognizer.ERROR_NO_MATCH,
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> scheduleListen(300)
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> scheduleListen(1500)
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                setRosaOn(false)
+                status.text = getString(R.string.err_mic_permission)
+            }
+            else -> {
+                failures++
+                if (failures >= 5) {
+                    setRosaOn(false)
+                    status.text = getString(R.string.err_speech_giveup) + " (" + error + ")"
+                } else {
+                    status.text = getString(R.string.err_speech_generic) + " (" + error + ")"
+                    scheduleListen(2500)
+                }
+            }
+        }
+    }
+
+    private fun sendText(text: String) {
+        input.setText(text)
+        onSend()
     }
 
     // ---------- chat ----------
@@ -218,7 +419,9 @@ class MainActivity : AppCompatActivity() {
                     onSaved()
                 }
             }
-            .setNegativeButton(android.R.string.cancel, null)
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                if (rosaOn) scheduleListen(500)
+            }
             .show()
     }
 
@@ -262,6 +465,11 @@ class MainActivity : AppCompatActivity() {
         val modelQuestion =
             if (language == "en-US") question + "\n(Please answer in English.)" else question
 
+        if (listening) {
+            recognizer?.cancel()
+            setListening(false)
+        }
+        awake = false
         input.setText("")
         addBubble(question, true)
         setBusy(true)
@@ -303,6 +511,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 addBubble(answer, false)
                 setBusy(false)
+                if (rosaOn) scheduleListen(400)
             }
         }.start()
     }
