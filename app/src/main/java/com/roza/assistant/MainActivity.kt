@@ -1,14 +1,20 @@
 package com.roza.assistant
 
+import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Outline
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.view.Gravity
 import android.view.View
 import android.view.ViewOutlineProvider
@@ -19,19 +25,35 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
     private val history = ArrayList<Pair<String, String>>()
     private var busy = false
+    private var listening = false
+    private var language = "fa-IR"
+    private var recognizer: SpeechRecognizer? = null
 
     private lateinit var messages: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var input: EditText
     private lateinit var sendButton: Button
+    private lateinit var micButton: Button
+    private lateinit var langButton: Button
     private lateinit var status: TextView
+
+    private val micPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                startListening()
+            } else {
+                status.text = getString(R.string.err_mic_permission)
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +66,8 @@ class MainActivity : AppCompatActivity() {
         scroll = findViewById<ScrollView>(R.id.scroll)
         input = findViewById<EditText>(R.id.input)
         sendButton = findViewById<Button>(R.id.sendButton)
+        micButton = findViewById<Button>(R.id.micButton)
+        langButton = findViewById<Button>(R.id.langButton)
         status = findViewById<TextView>(R.id.status)
 
         makeRound(avatar)
@@ -51,6 +75,110 @@ class MainActivity : AppCompatActivity() {
         startBreathing(avatar, ring)
 
         sendButton.setOnClickListener { onSend() }
+        micButton.setOnClickListener { onMicClick() }
+        langButton.setOnClickListener {
+            language = if (language == "fa-IR") "en-US" else "fa-IR"
+            langButton.text = getString(if (language == "fa-IR") R.string.lang_fa else R.string.lang_en)
+        }
+    }
+
+    override fun onDestroy() {
+        recognizer?.destroy()
+        recognizer = null
+        super.onDestroy()
+    }
+
+    // ---------- voice input ----------
+
+    private fun onMicClick() {
+        if (busy) return
+        if (listening) {
+            recognizer?.stopListening()
+            return
+        }
+        val granted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            startListening()
+        } else {
+            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun setListening(value: Boolean) {
+        listening = value
+        micButton.text = if (value) "⏹" else "🎤"
+    }
+
+    private fun firstResult(bundle: Bundle?): String {
+        val list = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        return list?.firstOrNull()?.trim() ?: ""
+    }
+
+    private fun startListening() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            status.text = getString(R.string.err_no_recognizer)
+            return
+        }
+        val engine = recognizer ?: SpeechRecognizer.createSpeechRecognizer(this)
+        recognizer = engine
+
+        engine.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val text = firstResult(partialResults)
+                if (text.isNotEmpty()) {
+                    input.setText(text)
+                    input.setSelection(input.text.length)
+                }
+            }
+
+            override fun onResults(results: Bundle?) {
+                setListening(false)
+                val text = firstResult(results)
+                if (text.isEmpty()) {
+                    status.text = getString(R.string.err_heard_nothing)
+                } else {
+                    status.text = ""
+                    input.setText(text)
+                    onSend()
+                }
+            }
+
+            override fun onError(error: Int) {
+                setListening(false)
+                val message = when (error) {
+                    SpeechRecognizer.ERROR_NO_MATCH,
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> getString(R.string.err_heard_nothing)
+                    SpeechRecognizer.ERROR_NETWORK,
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
+                    SpeechRecognizer.ERROR_SERVER -> getString(R.string.err_speech_network)
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> getString(R.string.err_mic_permission)
+                    else -> getString(R.string.err_speech_generic)
+                }
+                status.text = message + " (" + error + ")"
+            }
+        })
+
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        intent.putExtra(
+            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+        )
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+
+        setListening(true)
+        status.text = getString(R.string.listening)
+        engine.startListening(intent)
     }
 
     // ---------- chat ----------
@@ -97,7 +225,8 @@ class MainActivity : AppCompatActivity() {
     private fun setBusy(value: Boolean) {
         busy = value
         sendButton.isEnabled = !value
-        status.visibility = if (value) View.VISIBLE else View.GONE
+        micButton.isEnabled = !value
+        status.text = if (value) getString(R.string.thinking) else ""
     }
 
     private fun addBubble(text: String, fromUser: Boolean) {
@@ -129,6 +258,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // In English mode, ask the model to answer in English.
+        val modelQuestion =
+            if (language == "en-US") question + "\n(Please answer in English.)" else question
+
         input.setText("")
         addBubble(question, true)
         setBusy(true)
@@ -143,7 +276,7 @@ class MainActivity : AppCompatActivity() {
                     models = client.listFreeModels()
                     saveModels(models)
                 }
-                val reply = client.chat(models, history, question)
+                val reply = client.chat(models, history, modelQuestion)
                 ok = true
                 reply
             } catch (e: ApiException) {
