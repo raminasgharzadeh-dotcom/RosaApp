@@ -8,6 +8,11 @@
     <string name="send">ارسال</string>
     <string name="thinking">رزا در حال فکر کردن…</string>
     <string name="listening">در حال گوش دادن…</string>
+    <string name="wait_wake">منتظرم بگی «سلام رزا»…</string>
+    <string name="say_command">بفرمایید، می‌شنوم…</string>
+    <string name="wake_reply">بفرمایید، چه کمکی می‌تونم بکنم؟</string>
+    <string name="off_status">رزا خاموش است. کلید «روشن» یا میکروفون را بزن.</string>
+    <string name="power_label">روشن</string>
     <string name="lang_fa">زبان: فارسی</string>
     <string name="lang_en">Language: English</string>
     <string name="key_title">کلید OpenRouter</string>
@@ -21,4 +26,5 @@
     <string name="err_heard_nothing">چیزی نشنیدم. دوباره امتحان کن.</string>
     <string name="err_speech_network">تشخیص گفتار به اینترنت و سرویس گوگل نیاز دارد.</string>
     <string name="err_speech_generic">تشخیص گفتار شکست خورد.</string>
+    <string name="err_speech_giveup">چند بار پشت سر هم تشخیص گفتار شکست خورد و رزا خاموش شد.</string>
 </resources>
