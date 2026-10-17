@@ -26,6 +26,12 @@ jobs:
           path: ~/.android/debug.keystore
           key: debug-keystore-v1
 
+      - name: Make the app icon from the avatar photo
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-pil
+          /usr/bin/python3 tools/make_icons.py
+
       - name: Make sure Android SDK pieces exist
         run: |
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
