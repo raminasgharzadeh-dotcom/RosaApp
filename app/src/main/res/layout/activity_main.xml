@@ -115,6 +115,14 @@
                 android:text="@string/lang_fa"
                 android:textColor="#FFFFFF"
                 android:textSize="13sp" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/powerSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:text="@string/power_label"
+                android:textColor="#FFFFFF" />
         </LinearLayout>
 
         <LinearLayout
