@@ -4,16 +4,21 @@
 - Stage 1: minimal app, GitHub Actions builds the APK, app installs and opens
 - Stage 2: galaxy background, round avatar, breathing ring, Persian greeting
 - Stage 3: typed chat with OpenRouter free models
+- Stage 4: speech input in Persian and English (some recognition mistakes remain)
+- Stage 6: app icon made from the avatar photo by tools/make_icons.py during the build
 
-## Stage 4 (built, untested until it is confirmed on the phone)
-- Mic button: speech recognition in Persian or English, result is sent automatically
-- Language button switches between Persian and English
-- Workflow now reuses the same debug signing key between builds
-- No voice output yet
+## Stage 5 (built, untested until confirmed on the phone)
+- Microphone starts by itself while the app is on screen; recognizer is fully released when the app leaves the screen
+- Wake phrase (Persian or English), on/off switch
+- Not voice-specific: anyone saying the wake phrase activates her
+
+## Next
+- Allow-list of apps Rosa may open, voice commands (alarm, dial, SMS draft, music)
+- Later: voice output with a female Persian voice, and a driving mode
 
 ## Files
 settings.gradle.kts, build.gradle.kts, gradle.properties,
-.github/workflows/build.yml, PROGRESS.md,
+.github/workflows/build.yml, PROGRESS.md, tools/make_icons.py,
 app/build.gradle.kts, app/src/main/AndroidManifest.xml,
 app/src/main/java/com/roza/assistant/MainActivity.kt,
 app/src/main/java/com/roza/assistant/OpenRouterClient.kt,
