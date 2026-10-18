@@ -7,20 +7,21 @@
 - Stage 4: speech input in Persian and English (some recognition mistakes remain)
 - Stage 5: on/off switch and wake phrase work, but every restart of the recognizer beeps (to be replaced by a silent offline wake word)
 - Stage 6: app icon made from the avatar photo by tools/make_icons.py during the build
+- Stage 7a: open allowed apps, alarm, timer, date, time, navigation work
 
-## Stage 7a (built, untested until confirmed on the phone)
-- Typed or spoken commands are handled on the phone, not by the chat model: open allowed apps, alarm, timer, date (Persian and Gregorian), time, music keys, navigation (Waze, Neshan, Balad)
-- The allowed apps are listed in AllowedApps.kt
+## Stage 7b (built, untested until confirmed on the phone)
+- Playing from Spotify or Music now sends the key to that app only (the first version played in the wrong app)
+- Volume commands with a step count, for example "صدا را ۳ بار کم کن"
 
 ## Next
-- Stage 7b: contacts lookup and calls through the Phone app
+- Contacts lookup and calls through the Phone app
 - Silent offline wake word (Vosk)
 - Weather (Open-Meteo), WhatsApp video call, voice output with a female Persian voice, reading Google Messages
 
 ## Files
 settings.gradle.kts, build.gradle.kts, gradle.properties,
 .github/workflows/build.yml, PROGRESS.md, tools/make_icons.py,
-app/build.gradle.kts, app/src/main/AndroidManifest.xml,
+app/build.gradle.kts, app/debug.keystore, app/src/main/AndroidManifest.xml,
 app/src/main/java/com/roza/assistant/MainActivity.kt,
 app/src/main/java/com/roza/assistant/OpenRouterClient.kt,
 app/src/main/java/com/roza/assistant/PersianUtils.kt,
