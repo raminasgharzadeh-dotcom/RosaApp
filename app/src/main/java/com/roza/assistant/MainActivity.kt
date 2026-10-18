@@ -382,7 +382,7 @@ class MainActivity : AppCompatActivity() {
         onSend()
     }
 
-    // ---------- chat ----------
+    // ---------- chat and commands ----------
 
     private fun prefs(): SharedPreferences =
         getSharedPreferences("rosa", Context.MODE_PRIVATE)
@@ -454,6 +454,22 @@ class MainActivity : AppCompatActivity() {
         if (busy) return
         val question = input.text.toString().trim()
         if (question.isEmpty()) return
+
+        // Commands (open an app, alarm, timer, date, music, navigation) are handled
+        // on the phone and never sent to the chat model.
+        val command = CommandRouter.parse(question)
+        if (command != null) {
+            if (listening) {
+                recognizer?.cancel()
+                setListening(false)
+            }
+            awake = false
+            input.setText("")
+            addBubble(question, true)
+            addBubble(Actions.execute(this, command), false)
+            if (rosaOn) scheduleListen(1500)
+            return
+        }
 
         val key = prefs().getString("key", "") ?: ""
         if (key.isEmpty()) {
