@@ -20,6 +20,7 @@ object Actions {
             is Command.SetAlarm -> setAlarm(context, command.hour, command.minute)
             is Command.SetTimer -> setTimer(context, command.seconds)
             is Command.Media -> media(context, command)
+            is Command.Volume -> volume(context, command)
             is Command.Navigate -> navigate(context, command)
             is Command.Reply -> command.text
             is Command.ShowDate -> PersianUtils.dateReply(Calendar.getInstance())
@@ -72,32 +73,71 @@ object Actions {
         }
     }
 
+    // Sends a media key to whatever player is active right now.
     private fun sendKey(context: Context, keyCode: Int) {
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
     }
 
-    private fun media(context: Context, command: Command.Media): String {
-        val app = command.app
-        if (app != null && command.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY) {
-            if (!AllowedApps.launch(context, app)) {
-                return "برنامه‌ی " + app.title + " روی گوشی پیدا نشد."
-            }
-            val appContext = context.applicationContext
-            Handler(Looper.getMainLooper()).postDelayed({
-                sendKey(appContext, command.keyCode)
-            }, 2000)
-            return app.title + " را باز کردم و دو ثانیه بعد دستور پخش را می‌فرستم."
+    // Sends a media key straight to one app, so it does not end up in another player.
+    private fun sendKeyToApp(context: Context, packageName: String, keyCode: Int) {
+        for (action in intArrayOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+            val intent = Intent(Intent.ACTION_MEDIA_BUTTON)
+            intent.setPackage(packageName)
+            intent.putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(action, keyCode))
+            context.sendBroadcast(intent)
         }
-        sendKey(context, command.keyCode)
-        val what = when (command.keyCode) {
+    }
+
+    private fun keyName(keyCode: Int): String {
+        return when (keyCode) {
             KeyEvent.KEYCODE_MEDIA_NEXT -> "بعدی"
             KeyEvent.KEYCODE_MEDIA_PREVIOUS -> "قبلی"
             KeyEvent.KEYCODE_MEDIA_PAUSE -> "توقف"
             else -> "پخش"
         }
-        return "دستور «" + what + "» را به پخش‌کننده‌ی موسیقی فرستادم."
+    }
+
+    private fun media(context: Context, command: Command.Media): String {
+        val app = command.app
+        if (app != null) {
+            // The user named a player (Spotify or Music): talk to that player only.
+            val pkg = AllowedApps.findPackage(context, app)
+                ?: return "برنامه‌ی " + app.title + " روی گوشی پیدا نشد."
+            if (command.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY) {
+                if (!AllowedApps.launch(context, app)) {
+                    return "نتوانستم " + app.title + " را باز کنم."
+                }
+                val appContext = context.applicationContext
+                Handler(Looper.getMainLooper()).postDelayed({
+                    sendKeyToApp(appContext, pkg, command.keyCode)
+                }, 2500)
+                return app.title + " را باز کردم و چند ثانیه بعد دستور «پخش» را مستقیم به همان برنامه می‌فرستم. اگر پخش نشد، بگو."
+            }
+            sendKeyToApp(context, pkg, command.keyCode)
+            return "دستور «" + keyName(command.keyCode) + "» را مستقیم به " + app.title + " فرستادم."
+        }
+        sendKey(context, command.keyCode)
+        return "دستور «" + keyName(command.keyCode) + "» را به پخش‌کننده‌ی فعلی فرستادم."
+    }
+
+    private fun volume(context: Context, command: Command.Volume): String {
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val direction = if (command.up) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+        for (i in 1..command.steps) {
+            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0)
+        }
+        // Show the volume bar once at the end.
+        audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI)
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val now = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val percent = if (max > 0) now * 100 / max else 0
+        val word = if (command.up) "زیاد" else "کم"
+        return PersianUtils.toPersianDigits(
+            "صدای موسیقی " + command.steps.toString() + " پله " + word +
+                " شد. الان " + percent.toString() + " درصد است."
+        )
     }
 
     private fun navigate(context: Context, command: Command.Navigate): String {
