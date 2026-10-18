@@ -8,6 +8,7 @@ sealed class Command {
     data class SetTimer(val seconds: Int) : Command()
     data class Media(val keyCode: Int, val app: AppEntry?) : Command()
     data class Navigate(val place: String, val app: AppEntry?) : Command()
+    data class Volume(val up: Boolean, val steps: Int) : Command()
     data class Reply(val text: String) : Command()
     object ShowDate : Command()
     object ShowTime : Command()
@@ -33,6 +34,7 @@ object CommandRouter {
         parseTimer(text)?.let { return it }
         parseAlarm(text)?.let { return it }
         parseNavigate(text)?.let { return it }
+        parseVolume(text)?.let { return it }
         parseMedia(text)?.let { return it }
         if (isDateQuestion(text)) return Command.ShowDate
         if (isTimeQuestion(text)) return Command.ShowTime
@@ -155,11 +157,38 @@ object CommandRouter {
             text.contains("what time") || text.contains("time is it")
     }
 
+    // ---------- volume ----------
+
+    private fun parseVolume(text: String): Command? {
+        if (text.split(" ").size > 8) return null
+        if (!Regex("(^|\\s)(صدا|صدای|volume)(\\s|$)").containsMatchIn(text)) return null
+
+        val cleaned = text.replace("کمی", " ")
+        val hasVerb = Regex("کن|کنید|ببر|بیار|بده|up|down|increase|decrease|raise|lower|turn|make")
+            .containsMatchIn(cleaned)
+        if (!hasVerb) return null
+
+        val up = Regex("زیاد|بالا|افزایش|بلند|بیشتر|up|increase|louder|raise").containsMatchIn(cleaned)
+        val down = Regex("کم|پایین|کاهش|آهسته|down|decrease|lower|quieter").containsMatchIn(cleaned)
+        if (up == down) return null
+
+        var steps = 1
+        val digits = Regex("(\\d+)\\s*(بار|پله|درجه|times|time|steps|step)").find(cleaned)
+        if (digits != null) {
+            steps = digits.groupValues[1].toIntOrNull() ?: 1
+        } else {
+            val words = numberWords.keys.sortedByDescending { it.length }.joinToString("|")
+            val spoken = Regex("($words)\\s*(بار|پله|درجه)").find(cleaned)
+            if (spoken != null) steps = numberWords[spoken.groupValues[1]] ?: 1
+        }
+        return Command.Volume(up, steps.coerceIn(1, 15))
+    }
+
     // ---------- music ----------
 
     private fun parseMedia(text: String): Command? {
         val words = text.split(" ")
-        val aboutMusic = Regex("آهنگ|اهنگ|موزیک|موسیقی|music|song|track|اسپاتیفای|spotify")
+        val aboutMusic = Regex("آهنگ|اهنگ|ترانه|موزیک|موسیقی|music|song|track|اسپاتیفای|spotify")
             .containsMatchIn(text)
         if (!aboutMusic && words.size != 1) return null
 
