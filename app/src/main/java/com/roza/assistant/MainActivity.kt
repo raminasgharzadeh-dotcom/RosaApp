@@ -450,6 +450,13 @@ class MainActivity : AppCompatActivity() {
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
+    // The recognizer often drops the last word, so a sentence that ends with "باز"
+    // is read as "باز کن".
+    private fun completeCommand(text: String): String {
+        val trimmed = text.trim().trimEnd('.')
+        return if (trimmed.endsWith(" باز")) trimmed + " کن" else trimmed
+    }
+
     private fun onSend() {
         if (busy) return
         val question = input.text.toString().trim()
@@ -457,7 +464,7 @@ class MainActivity : AppCompatActivity() {
 
         // Commands (open an app, alarm, timer, date, music, navigation) are handled
         // on the phone and never sent to the chat model.
-        val command = CommandRouter.parse(question)
+        val command = CommandRouter.parse(completeCommand(question))
         if (command != null) {
             if (listening) {
                 recognizer?.cancel()
@@ -510,11 +517,11 @@ class MainActivity : AppCompatActivity() {
                         wrongKey = true
                         getString(R.string.err_key)
                     }
-                    e.status == 429 -> getString(R.string.err_limit)
-                    else -> getString(R.string.err_generic)
+                    e.status == 429 -> getString(R.string.err_limit) + "\n(" + e.detail + ")"
+                    else -> getString(R.string.err_generic) + "\n(" + e.status + " " + e.detail + ")"
                 }
             } catch (e: Exception) {
-                getString(R.string.err_network)
+                getString(R.string.err_network) + "\n(" + e.javaClass.simpleName + ")"
             }
 
             runOnUiThread {
