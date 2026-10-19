@@ -5,13 +5,13 @@
 - Stage 2: galaxy background, round avatar, breathing ring, Persian greeting
 - Stage 3: typed chat with OpenRouter free models
 - Stage 4: speech input in Persian and English (some recognition mistakes remain)
-- Stage 5: on/off switch and wake phrase work, but every restart of the recognizer beeps (to be replaced by a silent offline wake word)
-- Stage 6: app icon made from the avatar photo by tools/make_icons.py during the build
-- Stage 7a: open allowed apps, alarm, timer, date, time, navigation work
+- Stage 5: on/off switch and wake phrase work, but every restart of the recognizer beeps
+- Stage 6: app icon made from the avatar photo during the build
+- Stage 7a: open allowed apps, alarm, timer, date, time, navigation
 
-## Stage 7b (built, untested until confirmed on the phone)
-- Playing from Spotify or Music now sends the key to that app only (the first version played in the wrong app)
-- Volume commands with a step count, for example "صدا را ۳ بار کم کن"
+## Built, untested until confirmed on the phone
+- Stage 7b: media keys go to the named player only; volume commands with a step count
+- Stage 7c: chat no longer prints "null" for an empty model answer, models that think first are tried last, real error reasons are shown, and a sentence ending with "باز" counts as "باز کن"
 
 ## Next
 - Contacts lookup and calls through the Phone app
