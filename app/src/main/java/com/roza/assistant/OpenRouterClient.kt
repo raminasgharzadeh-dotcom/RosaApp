@@ -12,6 +12,20 @@ class ApiException(val status: Int, val detail: String = "") : Exception("HTTP $
 
 class OpenRouterClient(private val apiKey: String) {
 
+    companion object {
+        // At most this many models are tried for one question, so a bad moment does not
+        // use up the free daily allowance.
+        private const val MAX_TRIES = 4
+
+        // Remembered while the app is running.
+        private var lastGood: String? = null
+        private val pausedUntil = HashMap<String, Long>()
+
+        private fun pause(model: String, minutes: Int) {
+            pausedUntil[model] = System.currentTimeMillis() + minutes * 60L * 1000L
+        }
+    }
+
     // Some free models refuse a separate "system" message, so these instructions
     // are put in front of the question instead.
     private val instructions =
@@ -55,7 +69,18 @@ class OpenRouterClient(private val apiKey: String) {
         var network: IOException? = null
         var sawOtherError = false
 
-        for (model in models) {
+        // Try the model that worked last first, and skip models that failed a moment ago.
+        val now = System.currentTimeMillis()
+        val good = lastGood
+        val usable = models.filter { (pausedUntil[it] ?: 0L) <= now }
+        val ordered = ArrayList<String>()
+        if (good != null && usable.contains(good)) ordered.add(good)
+        for (model in usable) {
+            if (model != good) ordered.add(model)
+        }
+        val candidates = if (ordered.isEmpty()) models.take(MAX_TRIES) else ordered.take(MAX_TRIES)
+
+        for (model in candidates) {
             try {
                 val body = JSONObject()
                     .put("model", model)
@@ -70,6 +95,7 @@ class OpenRouterClient(private val apiKey: String) {
                     lastStatus = error?.optInt("code", -1) ?: -1
                     lastDetail = model + ": " + (error?.optString("message", "") ?: "")
                     sawOtherError = true
+                    pause(model, 5)
                     continue
                 }
                 val message = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message")
@@ -77,22 +103,27 @@ class OpenRouterClient(private val apiKey: String) {
                 val reply = if (message.isNull("content")) "" else message.optString("content", "")
                 val cleaned = reply.replace(Regex("<think>[\\s\\S]*?</think>"), "").trim()
                 if (cleaned.isNotEmpty()) {
+                    lastGood = model
                     return cleaned
                 }
                 lastStatus = -2
                 lastDetail = model + ": empty answer"
                 sawOtherError = true
+                pause(model, 10)
             } catch (e: ApiException) {
                 if (e.status == 401) throw e
                 lastStatus = e.status
                 lastDetail = model + ": " + e.detail
                 sawOtherError = true
+                // A refused or missing model is skipped for a while, a busy one for a short time.
+                pause(model, if (e.status == 429) 3 else 30)
             } catch (e: IOException) {
                 network = e
             } catch (e: Exception) {
                 lastStatus = -1
                 lastDetail = model + ": " + e.javaClass.simpleName
                 sawOtherError = true
+                pause(model, 5)
             }
         }
 
@@ -100,7 +131,10 @@ class OpenRouterClient(private val apiKey: String) {
         if (!sawOtherError && connectionProblem != null) {
             throw connectionProblem
         }
-        throw ApiException(if (lastStatus == 0) -1 else lastStatus, lastDetail)
+        throw ApiException(
+            if (lastStatus == 0) -1 else lastStatus,
+            lastDetail + " [" + candidates.size + " models tried]"
+        )
     }
 
     private fun request(url: String, body: String?, withKey: Boolean): String {
