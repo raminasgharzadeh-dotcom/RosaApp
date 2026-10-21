@@ -186,20 +186,30 @@ object CommandRouter {
 
     // ---------- music ----------
 
+    // The time of the last music command. Right after one, a short "قطع کن" is understood.
+    private var lastMusicAt = 0L
+
     private fun parseMedia(text: String): Command? {
         val words = text.split(" ")
+        val stopRegex = Regex(
+            "توقف|مکث|وایسا|بس کن|بسه|متوقف|قطع|خاموش|ساکت|ببند|استپ|استاپ|pause|stop"
+        )
         val aboutMusic = Regex("آهنگ|اهنگ|ترانه|موزیک|موسیقی|music|song|track|اسپاتیفای|spotify")
-            .containsMatchIn(text)
-        if (!aboutMusic && words.size != 1) return null
+            .containsMatchIn(text) || (text.contains("پخش") && stopRegex.containsMatchIn(text))
+        val recentMusic = System.currentTimeMillis() - lastMusicAt < 10 * 60 * 1000L
+        val shortStop = recentMusic && words.size <= 3 && stopRegex.containsMatchIn(text)
+        if (!aboutMusic && words.size != 1 && !shortStop) return null
 
         val key = when {
-            Regex("بعدی|next|skip").containsMatchIn(text) -> KeyEvent.KEYCODE_MEDIA_NEXT
-            Regex("قبلی|previous|prev|back").containsMatchIn(text) -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
-            Regex("توقف|مکث|وایسا|بس کن|متوقف|pause|stop").containsMatchIn(text) ->
-                KeyEvent.KEYCODE_MEDIA_PAUSE
-            Regex("پخش|پلی|ادامه|play|resume").containsMatchIn(text) -> KeyEvent.KEYCODE_MEDIA_PLAY
+            Regex("بعدی|next|skip|عوض").containsMatchIn(text) -> KeyEvent.KEYCODE_MEDIA_NEXT
+            Regex("قبلی|previous|prev|back|برگرد").containsMatchIn(text) ->
+                KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            stopRegex.containsMatchIn(text) -> KeyEvent.KEYCODE_MEDIA_PAUSE
+            Regex("پخش|پلی|ادامه|بذار|بزن|شروع|play|resume").containsMatchIn(text) ->
+                KeyEvent.KEYCODE_MEDIA_PLAY
             else -> return null
         }
+        lastMusicAt = System.currentTimeMillis()
         val app = AllowedApps.mentioned(text, listOf("spotify", "music"))
         return Command.Media(key, app)
     }
