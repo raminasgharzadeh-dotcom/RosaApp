@@ -1,0 +1,35 @@
+name: Voice samples
+
+on:
+  workflow_dispatch:
+
+jobs:
+  samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download the three female voices
+        run: |
+          BASE="https://huggingface.co/karim23657/persian-tts-vits/resolve/main"
+          mkdir -p models samples
+          for NAME in persian-tts-female1-vits-coqui female-female-coqui-vits female-GPTInformal-coqui-vits; do
+            mkdir -p "models/$NAME"
+            curl -L --fail --retry 3 -o "models/$NAME/model.onnx" "$BASE/$NAME/model.onnx"
+            curl -L --fail --retry 3 -o "models/$NAME/tokens.txt" "$BASE/$NAME/tokens.txt"
+            curl -L --fail --retry 3 -o "samples/${NAME}_original_test.wav" "$BASE/$NAME/test.wav"
+          done
+          ls -la models/* samples
+
+      - name: Make samples with sherpa-onnx
+        continue-on-error: true
+        run: |
+          python3 -m venv venv
+          venv/bin/pip install --quiet sherpa-onnx
+          venv/bin/python tools/voice_samples.py
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rosa-voice-samples
+          path: samples
