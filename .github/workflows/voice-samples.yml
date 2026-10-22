@@ -21,6 +21,13 @@ jobs:
           done
           ls -la models/* samples
 
+      - name: Download the pronunciation data (espeak-ng)
+        run: |
+          curl -L --fail --retry 3 -o espeak-ng-data.tar.bz2 \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2
+          tar xf espeak-ng-data.tar.bz2
+          ls espeak-ng-data | head -5
+
       - name: Make samples with sherpa-onnx
         continue-on-error: true
         run: |
