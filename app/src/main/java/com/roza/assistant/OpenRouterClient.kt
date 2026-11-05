@@ -7,6 +7,7 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -30,24 +31,47 @@ class OpenRouterClient(private val apiKey: String) {
         }
     }
 
-    // Today's Persian (Solar Hijri) date, converted from the phone's clock.
-    // Returns an empty text on Android older than 7.0, which has no built-in converter.
+    // Today's Persian (Solar Hijri) date, worked out from the phone's date with plain
+    // arithmetic, so it needs no special Android library and works on every Android version.
     private fun persianDate(): String {
-        if (android.os.Build.VERSION.SDK_INT < 24) return ""
         return try {
-            val cal = android.icu.util.PersianCalendar()
+            val cal = Calendar.getInstance()
+            val gy = cal.get(Calendar.YEAR)
+            val gm = cal.get(Calendar.MONTH) + 1
+            val gd = cal.get(Calendar.DAY_OF_MONTH)
+
+            val before = intArrayOf(0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334)
+            val gy2 = if (gm > 2) gy + 1 else gy
+            var days = 355666 + 365 * gy + (gy2 + 3) / 4 - (gy2 + 99) / 100 +
+                (gy2 + 399) / 400 + gd + before[gm - 1]
+            var jy = -1595 + 33 * (days / 12053)
+            days %= 12053
+            jy += 4 * (days / 1461)
+            days %= 1461
+            if (days > 365) {
+                jy += (days - 1) / 365
+                days = (days - 1) % 365
+            }
+            val jm: Int
+            val jd: Int
+            if (days < 186) {
+                jm = 1 + days / 31
+                jd = 1 + days % 31
+            } else {
+                jm = 7 + (days - 186) / 30
+                jd = 1 + (days - 186) % 30
+            }
+
             val months = arrayOf(
                 "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
                 "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
             )
-            val days = arrayOf(
+            // Calendar.DAY_OF_WEEK: 1 is Sunday ... 7 is Saturday.
+            val weekDays = arrayOf(
                 "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"
             )
-            val dayName = days[cal.get(android.icu.util.Calendar.DAY_OF_WEEK) - 1]
-            val day = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
-            val month = months[cal.get(android.icu.util.Calendar.MONTH)]
-            val year = cal.get(android.icu.util.Calendar.YEAR)
-            "$dayName $day $month $year"
+            val dayName = weekDays[cal.get(Calendar.DAY_OF_WEEK) - 1]
+            dayName + " " + jd + " " + months[jm - 1] + " " + jy
         } catch (e: Exception) {
             ""
         }
@@ -191,7 +215,13 @@ class OpenRouterClient(private val apiKey: String) {
             }
             val status = connection.responseCode
             if (status !in 200..299) {
-                throw ApiException(status, shortError(readText(connection.errorStream)))
+                // The label tells which request failed, and the server name tells who answered.
+                val label = if (url.endsWith("/models")) "[model list]" else "[chat]"
+                val server = connection.getHeaderField("Server") ?: "?"
+                throw ApiException(
+                    status,
+                    label + " server=" + server + " " + shortError(readText(connection.errorStream))
+                )
             }
             return readText(connection.inputStream)
         } finally {
