@@ -150,6 +150,7 @@ class OpenRouterClient(private val apiKey: String) {
         var lastDetail = ""
         var network: IOException? = null
         var sawOtherError = false
+        var tried = 0
 
         // Try the model that worked last first, and skip models that failed a moment ago.
         val now = System.currentTimeMillis()
@@ -163,6 +164,7 @@ class OpenRouterClient(private val apiKey: String) {
         val candidates = if (ordered.isEmpty()) models.take(MAX_TRIES) else ordered.take(MAX_TRIES)
 
         for (model in candidates) {
+            tried++
             try {
                 val body = JSONObject()
                     .put("model", model)
@@ -197,6 +199,11 @@ class OpenRouterClient(private val apiKey: String) {
                 lastStatus = e.status
                 lastDetail = model + ": " + e.detail
                 sawOtherError = true
+                // A block by the security layer (Cloudflare) is not the model's fault and
+                // would hit every other model too, so stop here and do not pause the model.
+                if (e.status == 403 && e.detail.contains("security policy")) {
+                    break
+                }
                 // A refused or missing model is skipped for a while, a busy one for a short time.
                 pause(model, if (e.status == 429) 3 else 30)
             } catch (e: IOException) {
@@ -215,7 +222,7 @@ class OpenRouterClient(private val apiKey: String) {
         }
         throw ApiException(
             if (lastStatus == 0) -1 else lastStatus,
-            lastDetail + " [" + candidates.size + " models tried]"
+            lastDetail + " [" + tried + " models tried]"
         )
     }
 
@@ -224,6 +231,14 @@ class OpenRouterClient(private val apiKey: String) {
         try {
             connection.connectTimeout = 15000
             connection.readTimeout = 60000
+            // An honest name for the app, plus OpenRouter's two optional headers that
+            // say which app is calling.
+            connection.setRequestProperty("User-Agent", "RosaApp/1.0 (Android)")
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("X-Title", "Rosa")
+            connection.setRequestProperty(
+                "HTTP-Referer", "https://github.com/raminasgharzadeh-dotcom/RosaApp"
+            )
             if (withKey) {
                 connection.setRequestProperty("Authorization", "Bearer $apiKey")
             }
