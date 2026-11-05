@@ -6,6 +6,10 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 // A reply from OpenRouter that is not a success. detail is a short reason.
 class ApiException(val status: Int, val detail: String = "") : Exception("HTTP $status $detail")
@@ -27,10 +31,16 @@ class OpenRouterClient(private val apiKey: String) {
     }
 
     // Some free models refuse a separate "system" message, so these instructions
-    // are put in front of the question instead.
-    private val instructions =
-        "تو «رزا» هستی، یک دستیار صوتی فارسی‌زبان، صمیمی و مفید. " +
-            "کوتاه جواب بده (حداکثر سه جمله)، محاوره‌ای و بدون مارک‌داون و فهرست."
+    // are put in front of the question instead. The phone's current date and time are
+    // added every time, because the models do not know today's date by themselves.
+    private fun instructions(): String {
+        val format = SimpleDateFormat("EEEE, yyyy-MM-dd HH:mm", Locale.ENGLISH)
+        val now = format.format(Date()) + " (" + TimeZone.getDefault().id + ")"
+        return "تو «رزا» هستی، یک دستیار صوتی فارسی‌زبان، صمیمی و مفید. " +
+            "کوتاه جواب بده (حداکثر سه جمله)، محاوره‌ای و بدون مارک‌داون و فهرست. " +
+            "تاریخ و ساعت فعلی گوشی کاربر این است: " + now + ". " +
+            "اگر دربارهٔ تاریخ، روز یا ساعت پرسید، فقط از همین استفاده کن."
+    }
 
     // Returns up to 8 free model ids. Models that "think" first are put last, because
     // they often use up all their words thinking and return an empty answer.
@@ -61,7 +71,7 @@ class OpenRouterClient(private val apiKey: String) {
             messages.put(JSONObject().put("role", item.first).put("content", item.second))
         }
         messages.put(
-            JSONObject().put("role", "user").put("content", instructions + "\n\n" + question)
+            JSONObject().put("role", "user").put("content", instructions() + "\n\n" + question)
         )
 
         var lastStatus = 0
