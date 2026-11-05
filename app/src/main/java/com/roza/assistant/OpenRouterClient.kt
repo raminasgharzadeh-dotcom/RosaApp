@@ -22,6 +22,15 @@ class OpenRouterClient(private val apiKey: String) {
         // use up the free daily allowance.
         private const val MAX_TRIES = 4
 
+        // Used when the live list of free models cannot be fetched (for example when
+        // Cloudflare answers 403). "openrouter/free" is OpenRouter's own router: it picks a
+        // working free model by itself, so it does not go out of date when models change.
+        private val FALLBACK_MODELS = listOf(
+            "openrouter/free",
+            "qwen/qwen3-coder:free",
+            "nvidia/nemotron-3.5-lightning:free"
+        )
+
         // Remembered while the app is running.
         private var lastGood: String? = null
         private val pausedUntil = HashMap<String, Long>()
@@ -96,7 +105,18 @@ class OpenRouterClient(private val apiKey: String) {
 
     // Returns up to 8 free model ids. Models that "think" first are put last, because
     // they often use up all their words thinking and return an empty answer.
+    // If the live list cannot be fetched, the built-in fallback list is returned instead,
+    // so one failed request does not stop the chat.
     fun listFreeModels(): List<String> {
+        return try {
+            val live = fetchFreeModels()
+            if (live.isEmpty()) FALLBACK_MODELS else live
+        } catch (e: Exception) {
+            FALLBACK_MODELS
+        }
+    }
+
+    private fun fetchFreeModels(): List<String> {
         val text = request("https://openrouter.ai/api/v1/models", null, false)
         val data = JSONObject(text).getJSONArray("data")
         val preferred = Regex("llama|gemma|mistral|qwen", RegexOption.IGNORE_CASE)
