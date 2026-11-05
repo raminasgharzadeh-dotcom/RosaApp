@@ -30,16 +30,44 @@ class OpenRouterClient(private val apiKey: String) {
         }
     }
 
+    // Today's Persian (Solar Hijri) date, converted from the phone's clock.
+    // Returns an empty text on Android older than 7.0, which has no built-in converter.
+    private fun persianDate(): String {
+        if (android.os.Build.VERSION.SDK_INT < 24) return ""
+        return try {
+            val cal = android.icu.util.PersianCalendar()
+            val months = arrayOf(
+                "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+                "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+            )
+            val days = arrayOf(
+                "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"
+            )
+            val dayName = days[cal.get(android.icu.util.Calendar.DAY_OF_WEEK) - 1]
+            val day = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
+            val month = months[cal.get(android.icu.util.Calendar.MONTH)]
+            val year = cal.get(android.icu.util.Calendar.YEAR)
+            "$dayName $day $month $year"
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
     // Some free models refuse a separate "system" message, so these instructions
     // are put in front of the question instead. The phone's current date and time are
     // added every time, because the models do not know today's date by themselves.
     private fun instructions(): String {
         val format = SimpleDateFormat("EEEE, yyyy-MM-dd HH:mm", Locale.ENGLISH)
         val now = format.format(Date()) + " (" + TimeZone.getDefault().id + ")"
+        val persian = persianDate()
+        val persianPart = if (persian.isEmpty()) "" else
+            "تاریخ شمسی امروز: " + persian + ". "
         return "تو «رزا» هستی، یک دستیار صوتی فارسی‌زبان، صمیمی و مفید. " +
             "کوتاه جواب بده (حداکثر سه جمله)، محاوره‌ای و بدون مارک‌داون و فهرست. " +
             "تاریخ و ساعت فعلی گوشی کاربر این است: " + now + ". " +
-            "اگر دربارهٔ تاریخ، روز یا ساعت پرسید، فقط از همین استفاده کن."
+            persianPart +
+            "اگر دربارهٔ تاریخ، روز یا ساعت پرسید، فقط از همین استفاده کن " +
+            "و تاریخ شمسی را خودت حدس نزن و حساب نکن."
     }
 
     // Returns up to 8 free model ids. Models that "think" first are put last, because
