@@ -9,6 +9,7 @@ sealed class Command {
     data class Media(val keyCode: Int, val app: AppEntry?) : Command()
     data class Navigate(val place: String, val app: AppEntry?) : Command()
     data class Volume(val up: Boolean, val steps: Int) : Command()
+    data class Call(val name: String) : Command()
     data class Reply(val text: String) : Command()
     object ShowDate : Command()
     object ShowTime : Command()
@@ -33,6 +34,7 @@ object CommandRouter {
 
         parseTimer(text)?.let { return it }
         parseAlarm(text)?.let { return it }
+        parseCall(text)?.let { return it }
         parseNavigate(text)?.let { return it }
         parseVolume(text)?.let { return it }
         parseMedia(text)?.let { return it }
@@ -40,6 +42,34 @@ object CommandRouter {
         if (isTimeQuestion(text)) return Command.ShowTime
         parseOpenApp(text)?.let { return it }
         return null
+    }
+
+    // ---------- phone calls ----------
+
+    private val callRegex = Regex(
+        "زنگ\\s*(بزن|بزنم|بزنی|بزنید)|" +
+            "تماس\\s*(بگیر|بگیرم|بگیری|بگیرید)|" +
+            "شماره.*(بگیر|بگیرم|بگیری)|" +
+            "^تماس\\s+با\\s|" +
+            "(^|\\s)(call|dial|phone|ring)(\\s|$)"
+    )
+
+    // Words that belong to the request itself and are not part of the name.
+    private val callStopWords = setOf(
+        "زنگ", "بزن", "بزنم", "بزنی", "بزنید", "تماس", "بگیر", "بگیرم", "بگیری", "بگیرید",
+        "شماره", "شماره‌ی", "به", "با", "برای", "رو", "را", "لطفا", "لطفاً", "تلفن", "موبایل",
+        "call", "dial", "phone", "ring", "to", "please", "the", "number", "of"
+    )
+
+    private fun parseCall(text: String): Command? {
+        val words = text.split(" ").filter { it.isNotEmpty() }
+        if (words.size > 8) return null
+        if (!callRegex.containsMatchIn(text)) return null
+        val name = words.filter { it !in callStopWords }.joinToString(" ").trim()
+        if (name.isEmpty()) {
+            return Command.Reply("به چه کسی زنگ بزنم؟ مثلاً بگو: به علی زنگ بزن.")
+        }
+        return Command.Call(name)
     }
 
     // ---------- timer and alarm ----------
