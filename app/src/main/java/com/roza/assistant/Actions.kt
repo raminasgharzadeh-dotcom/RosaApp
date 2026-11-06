@@ -253,8 +253,11 @@ object Actions {
 
     private fun navigate(context: Context, command: Command.Navigate): String {
         val place = command.place
-        val app = command.app ?: AllowedApps.firstInstalled(context, listOf("neshan", "balad", "waze"))
-            ?: return "هیچ‌کدام از نشان، بلد و ویز روی گوشی پیدا نشد."
+        // If no app was named, Waze comes first; Neshan and Balad are used only without it.
+        val app = command.app
+            ?: AllowedApps.firstInstalled(context, listOf("waze"))
+            ?: AllowedApps.firstInstalled(context, listOf("neshan", "balad"))
+            ?: return "هیچ‌کدام از ویز، نشان و بلد روی گوشی پیدا نشد."
         val pkg = AllowedApps.findPackage(context, app)
             ?: return "برنامه‌ی " + app.title + " روی گوشی پیدا نشد."
 
