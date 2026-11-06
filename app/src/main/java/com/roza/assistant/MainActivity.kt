@@ -206,9 +206,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setListening(value: Boolean) {
         listening = value
-        // While Rosa is switched on, the recognizer restarts by itself again and again,
-        // so the button keeps one steady look instead of flickering.
-        micButton.text = if (value && !rosaOn) "⏹" else "🎤"
+        micButton.text = if (value) "⏹" else "🎤"
     }
 
     private fun stopRecognizer() {
@@ -327,7 +325,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleLoopResult(text: String) {
         if (busy) return
         if (text.isEmpty()) {
-            scheduleListen(700)
+            scheduleListen(300)
             return
         }
         val normalized = normalize(text)
@@ -353,14 +351,14 @@ class MainActivity : AppCompatActivity() {
             sendText(text)
         } else {
             // Not for Rosa: ignore it and keep waiting for the wake phrase.
-            scheduleListen(500)
+            scheduleListen(200)
         }
     }
 
     private fun handleLoopError(error: Int) {
         when (error) {
             SpeechRecognizer.ERROR_NO_MATCH,
-            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> scheduleListen(700)
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> scheduleListen(300)
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> scheduleListen(1500)
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
                 setRosaOn(false)
@@ -612,8 +610,8 @@ class MainActivity : AppCompatActivity() {
         val animators = listOf(
             ObjectAnimator.ofFloat(avatar, View.SCALE_X, 1f, 1.04f),
             ObjectAnimator.ofFloat(avatar, View.SCALE_Y, 1f, 1.04f),
-            ObjectAnimator.ofFloat(ring, View.SCALE_X, 1f, 1.1f),
             ObjectAnimator.ofFloat(ring, View.SCALE_Y, 1f, 1.1f),
+            ObjectAnimator.ofFloat(ring, View.SCALE_X, 1f, 1.1f),
             ObjectAnimator.ofFloat(ring, View.ALPHA, 0.9f, 0.3f)
         )
         for (animator in animators) {
