@@ -1,13 +1,19 @@
 package com.roza.assistant
 
+import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
+import android.provider.ContactsContract
 import android.view.KeyEvent
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import java.util.Calendar
 import java.util.Locale
 
@@ -22,6 +28,7 @@ object Actions {
             is Command.Media -> media(context, command)
             is Command.Volume -> volume(context, command)
             is Command.Navigate -> navigate(context, command)
+            is Command.Call -> call(context, command.name)
             is Command.Reply -> command.text
             is Command.ShowDate -> PersianUtils.dateReply(Calendar.getInstance())
             is Command.ShowTime -> PersianUtils.timeReply(Calendar.getInstance())
@@ -44,6 +51,106 @@ object Actions {
             "برنامه‌ی " + app.title + " روی گوشی پیدا نشد."
         }
     }
+
+    // ---------- phone calls ----------
+
+    private class ContactHit(val name: String, val number: String, val score: Int)
+
+    // Persian and Arabic-Indic digits become ordinary digits.
+    private fun asciiDigit(c: Char): Char {
+        return when (c) {
+            in '۰'..'۹' -> '0' + (c - '۰')
+            in '٠'..'٩' -> '0' + (c - '٠')
+            else -> c
+        }
+    }
+
+    // Opens the phone's dialer with the number filled in. The person presses the call button.
+    private fun dial(context: Context, number: String, who: String): String {
+        val intent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null))
+        val shown = PersianUtils.toPersianDigits(number)
+        return if (start(context, intent)) {
+            "صفحه‌ی شماره‌گیر را برای «" + who + "» باز کردم (" + shown + "). دکمه‌ی تماس را خودت بزن."
+        } else {
+            "نتوانستم برنامه‌ی تماس گوشی را باز کنم."
+        }
+    }
+
+    private fun call(context: Context, rawName: String): String {
+        // A spoken or typed number is dialed as it is.
+        val digits = rawName.map { asciiDigit(it) }.joinToString("")
+        val compact = digits.replace(Regex("[\\s\\-+()]"), "")
+        if (compact.length >= 3 && compact.all { it.isDigit() }) {
+            val number = (if (digits.trim().startsWith("+")) "+" else "") + compact
+            return dial(context, number, number)
+        }
+
+        val allowed = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.READ_CONTACTS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!allowed) {
+            val activity = context as? Activity
+            if (activity != null) {
+                ActivityCompat.requestPermissions(
+                    activity, arrayOf(Manifest.permission.READ_CONTACTS), 77
+                )
+            }
+            return "برای پیدا کردن شماره باید اجازه‌ی دسترسی به مخاطبین را بدهی. اجازه را که دادی، دوباره بگو."
+        }
+
+        val hits = findContacts(context, rawName)
+            ?: return "نتوانستم مخاطبین را بخوانم."
+        if (hits.isEmpty()) {
+            return "مخاطبی با نام «" + rawName + "» پیدا نکردم."
+        }
+
+        val best = hits.maxOf { it.score }
+        val top = hits.filter { it.score == best }
+        val names = top.map { it.name }.distinct()
+        if (names.size > 1) {
+            return "چند مخاطب پیدا کردم: " + names.take(4).joinToString("، ") +
+                ". اسم کامل‌تر را بگو."
+        }
+        return dial(context, top[0].number, names[0])
+    }
+
+    // Looks through the phone's contacts on the phone itself; nothing is sent anywhere.
+    private fun findContacts(context: Context, query: String): List<ContactHit>? {
+        val wanted = PersianUtils.normalize(query)
+        val wantedWords = wanted.split(" ").filter { it.isNotEmpty() }
+        if (wantedWords.isEmpty()) return emptyList()
+        val found = ArrayList<ContactHit>()
+        try {
+            val cursor = context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                null, null, null
+            )
+            cursor?.use { c ->
+                while (c.moveToNext()) {
+                    val name = c.getString(0) ?: continue
+                    val number = c.getString(1) ?: continue
+                    val normalized = PersianUtils.normalize(name)
+                    val nameWords = normalized.split(" ").filter { it.isNotEmpty() }
+                    val score = when {
+                        normalized == wanted -> 3
+                        wantedWords.all { w -> nameWords.any { n -> n.startsWith(w) } } -> 2
+                        normalized.contains(wanted) -> 1
+                        else -> 0
+                    }
+                    if (score > 0) found.add(ContactHit(name, number, score))
+                }
+            }
+        } catch (e: Exception) {
+            return null
+        }
+        return found
+    }
+
+    // ---------- alarm and timer ----------
 
     private fun setAlarm(context: Context, hour: Int, minute: Int): String {
         val intent = Intent(AlarmClock.ACTION_SET_ALARM)
@@ -72,6 +179,8 @@ object Actions {
             "برنامه‌ی ساعت گوشی تایمر را نپذیرفت."
         }
     }
+
+    // ---------- music ----------
 
     // Sends a media key to whatever player is active right now.
     private fun sendKey(context: Context, keyCode: Int) {
@@ -139,6 +248,8 @@ object Actions {
                 " شد. الان " + percent.toString() + " درصد است."
         )
     }
+
+    // ---------- navigation ----------
 
     private fun navigate(context: Context, command: Command.Navigate): String {
         val place = command.place
