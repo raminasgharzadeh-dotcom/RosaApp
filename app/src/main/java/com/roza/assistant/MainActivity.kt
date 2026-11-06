@@ -462,6 +462,29 @@ class MainActivity : AppCompatActivity() {
         val question = input.text.toString().trim()
         if (question.isEmpty()) return
 
+        // Weather questions need the internet, so they run in the background and are
+        // answered on the phone, never by the chat model.
+        val weatherCity = Weather.cityFrom(completeCommand(question))
+        if (weatherCity != null) {
+            if (listening) {
+                recognizer?.cancel()
+                setListening(false)
+            }
+            awake = false
+            input.setText("")
+            addBubble(question, true)
+            setBusy(true)
+            Thread {
+                val answer = Weather.reply(weatherCity)
+                runOnUiThread {
+                    addBubble(answer, false)
+                    setBusy(false)
+                    if (rosaOn) scheduleListen(400)
+                }
+            }.start()
+            return
+        }
+
         // Commands (open an app, alarm, timer, date, music, navigation) are handled
         // on the phone and never sent to the chat model.
         val command = CommandRouter.parse(completeCommand(question))
@@ -610,8 +633,8 @@ class MainActivity : AppCompatActivity() {
         val animators = listOf(
             ObjectAnimator.ofFloat(avatar, View.SCALE_X, 1f, 1.04f),
             ObjectAnimator.ofFloat(avatar, View.SCALE_Y, 1f, 1.04f),
-            ObjectAnimator.ofFloat(ring, View.SCALE_Y, 1f, 1.1f),
             ObjectAnimator.ofFloat(ring, View.SCALE_X, 1f, 1.1f),
+            ObjectAnimator.ofFloat(ring, View.SCALE_Y, 1f, 1.1f),
             ObjectAnimator.ofFloat(ring, View.ALPHA, 0.9f, 0.3f)
         )
         for (animator in animators) {
