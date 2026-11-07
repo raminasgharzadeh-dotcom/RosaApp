@@ -22,57 +22,48 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <LinearLayout
+        <!-- Rosa's picture: big, at the top and in the middle -->
+        <FrameLayout
+            android:layout_width="220dp"
+            android:layout_height="220dp"
+            android:layout_gravity="center_horizontal">
+
+            <View
+                android:id="@+id/ring"
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                android:layout_gravity="center"
+                android:background="@drawable/ring" />
+
+            <ImageView
+                android:id="@+id/avatar"
+                android:layout_width="172dp"
+                android:layout_height="172dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/rosa_title"
+                android:scaleType="centerCrop" />
+        </FrameLayout>
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="@string/rosa_title"
+            android:textColor="#FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
 
-            <FrameLayout
-                android:layout_width="110dp"
-                android:layout_height="110dp">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:text="@string/greeting"
+            android:textColor="#D9D5FF"
+            android:textSize="15sp" />
 
-                <View
-                    android:id="@+id/ring"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/ring" />
-
-                <ImageView
-                    android:id="@+id/avatar"
-                    android:layout_width="86dp"
-                    android:layout_height="86dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/rosa_title"
-                    android:scaleType="centerCrop" />
-            </FrameLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/rosa_title"
-                    android:textColor="#FFFFFF"
-                    android:textSize="28sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/greeting"
-                    android:textColor="#D9D5FF"
-                    android:textSize="15sp" />
-            </LinearLayout>
-        </LinearLayout>
-
+        <!-- The chat is under the picture and takes the rest of the screen -->
         <ScrollView
             android:id="@+id/scroll"
             android:layout_width="match_parent"
