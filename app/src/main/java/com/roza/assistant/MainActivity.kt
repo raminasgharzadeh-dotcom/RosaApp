@@ -457,31 +457,43 @@ class MainActivity : AppCompatActivity() {
         return if (trimmed.endsWith(" باز")) trimmed + " کن" else trimmed
     }
 
+    // Shows the question, then works out the answer in the background (the work may use
+    // the internet) and shows it when it is ready. The chat model is not used.
+    private fun answerInBackground(question: String, work: () -> String) {
+        if (listening) {
+            recognizer?.cancel()
+            setListening(false)
+        }
+        awake = false
+        input.setText("")
+        addBubble(question, true)
+        setBusy(true)
+        Thread {
+            val answer = work()
+            runOnUiThread {
+                addBubble(answer, false)
+                setBusy(false)
+                if (rosaOn) scheduleListen(400)
+            }
+        }.start()
+    }
+
     private fun onSend() {
         if (busy) return
         val question = input.text.toString().trim()
         if (question.isEmpty()) return
 
-        // Weather questions need the internet, so they run in the background and are
-        // answered on the phone, never by the chat model.
+        // Weather questions need the internet, so they run in the background.
         val weatherCity = Weather.cityFrom(completeCommand(question))
         if (weatherCity != null) {
-            if (listening) {
-                recognizer?.cancel()
-                setListening(false)
-            }
-            awake = false
-            input.setText("")
-            addBubble(question, true)
-            setBusy(true)
-            Thread {
-                val answer = Weather.reply(weatherCity)
-                runOnUiThread {
-                    addBubble(answer, false)
-                    setBusy(false)
-                    if (rosaOn) scheduleListen(400)
-                }
-            }.start()
+            answerInBackground(question) { Weather.reply(weatherCity) }
+            return
+        }
+
+        // "What time is it in <city>": a place that is not the phone's own.
+        val clockCity = WorldClock.cityFrom(completeCommand(question))
+        if (clockCity != null) {
+            answerInBackground(question) { WorldClock.reply(clockCity) }
             return
         }
 
