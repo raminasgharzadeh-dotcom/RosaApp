@@ -4,7 +4,8 @@
     android:layout_height="match_parent"
     android:background="#0B0A2A">
 
-    <ImageView
+    <!-- The galaxy picture, slowly moving -->
+    <com.roza.assistant.DriftingImageView
         android:id="@+id/background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -15,6 +16,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#77060620" />
+
+    <!-- Twinkling stars over the picture -->
+    <com.roza.assistant.StarField
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <LinearLayout
         android:layout_width="match_parent"
