@@ -60,18 +60,22 @@ object Extras {
     // ---------- camera ----------
 
     // Opens the phone's own camera app, ready for a photo or a video. The person presses
-    // the shutter button; Rosa cannot take the picture for them.
+    // the shutter or record button; Rosa cannot take the picture for them.
     private fun camera(context: Context, text: String): String? {
         val words = text.split(" ").filter { it.isNotEmpty() }
         if (words.size > 8) return null
         val cameraWord = text.contains("دوربین") || text.contains("camera")
         val takePhoto = text.contains("عکس") &&
             Regex("بگیر|بگیرم|بندازم|بزن").containsMatchIn(text)
-        if (!cameraWord && !takePhoto) return null
+        // "I want to film", "start filming", "record a video".
+        val takeVideo = Regex(
+            "فیلم ?بردار|(فیلم|ویدیو|ویدئو) ?(بگیر|بگیرم|بگیری)|ضبط ?(فیلم|ویدیو|ویدئو)"
+        ).containsMatchIn(text)
+        if (!cameraWord && !takePhoto && !takeVideo) return null
         val open = Regex("باز|اجرا|بیار|روشن|open|launch|start").containsMatchIn(text)
-        if (cameraWord && !open && !takePhoto) return null
+        if (cameraWord && !open && !takePhoto && !takeVideo) return null
 
-        val video = Regex("فیلم|ویدیو|ویدئو|video").containsMatchIn(text)
+        val video = takeVideo || Regex("فیلم|ویدیو|ویدئو|video").containsMatchIn(text)
         val action = if (video) {
             MediaStore.INTENT_ACTION_VIDEO_CAMERA
         } else {
