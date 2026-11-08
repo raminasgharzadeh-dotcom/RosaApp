@@ -7,13 +7,14 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.BatteryManager
 import android.os.Build
+import android.provider.MediaStore
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.Calendar
 import java.util.Locale
 
 // Small helpers that work on the phone itself, without the internet: calculator,
-// date arithmetic, flashlight and battery level.
+// date arithmetic, flashlight, camera and battery level.
 object Extras {
 
     // Returns the answer, or null when the sentence is not for one of these helpers.
@@ -21,6 +22,7 @@ object Extras {
         val text = clean(raw)
         if (text.isEmpty()) return null
         flashlight(context, text)?.let { return it }
+        camera(context, text)?.let { return it }
         battery(context, text)?.let { return it }
         dateMath(text)?.let { return it }
         calculate(text)?.let { return it }
@@ -53,6 +55,40 @@ object Extras {
         t = t.replace(Regex("[؟?!،؛]"), " ")
         t = t.lowercase(Locale.ROOT)
         return t.replace(Regex("\\s+"), " ").trim()
+    }
+
+    // ---------- camera ----------
+
+    // Opens the phone's own camera app, ready for a photo or a video. The person presses
+    // the shutter button; Rosa cannot take the picture for them.
+    private fun camera(context: Context, text: String): String? {
+        val words = text.split(" ").filter { it.isNotEmpty() }
+        if (words.size > 8) return null
+        val cameraWord = text.contains("دوربین") || text.contains("camera")
+        val takePhoto = text.contains("عکس") &&
+            Regex("بگیر|بگیرم|بندازم|بزن").containsMatchIn(text)
+        if (!cameraWord && !takePhoto) return null
+        val open = Regex("باز|اجرا|بیار|روشن|open|launch|start").containsMatchIn(text)
+        if (cameraWord && !open && !takePhoto) return null
+
+        val video = Regex("فیلم|ویدیو|ویدئو|video").containsMatchIn(text)
+        val action = if (video) {
+            MediaStore.INTENT_ACTION_VIDEO_CAMERA
+        } else {
+            MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
+        }
+        val intent = Intent(action)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            context.startActivity(intent)
+            if (video) {
+                "دوربین را در حالت فیلمبرداری باز کردم. دکمهٔ ضبط را خودت بزن."
+            } else {
+                "دوربین را باز کردم. دکمهٔ عکس را خودت بزن."
+            }
+        } catch (e: Exception) {
+            "نتوانستم دوربین را باز کنم."
+        }
     }
 
     // ---------- flashlight ----------
