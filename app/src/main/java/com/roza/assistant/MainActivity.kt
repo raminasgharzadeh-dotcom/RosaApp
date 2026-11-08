@@ -497,6 +497,22 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // Small helpers that work on the phone itself (calculator, date arithmetic,
+        // flashlight, battery). They are quick, so no background work is needed.
+        val extra = Extras.handle(this, completeCommand(question))
+        if (extra != null) {
+            if (listening) {
+                recognizer?.cancel()
+                setListening(false)
+            }
+            awake = false
+            input.setText("")
+            addBubble(question, true)
+            addBubble(extra, false)
+            if (rosaOn) scheduleListen(1500)
+            return
+        }
+
         // Commands (open an app, alarm, timer, date, music, navigation) are handled
         // on the phone and never sent to the chat model.
         val command = CommandRouter.parse(completeCommand(question))
